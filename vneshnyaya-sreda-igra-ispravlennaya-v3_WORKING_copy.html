@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Внешняя среда: игра на опережение</title>
+<style>
+:root{--bg:#f3f5f2;--surface:#fff;--ink:#16211c;--muted:#5d6b64;--line:#d5dcd7;--accent:#1f6f5c;--on:#fff;--up:#1f7a45;--down:#b3402f;--card:#fff7e0}
+@media (prefers-color-scheme:dark){:root{--bg:#121816;--surface:#1b2420;--ink:#e8efeb;--muted:#9aa9a1;--line:#2f3b35;--accent:#4fb89c;--on:#0c1512;--up:#5ac98a;--down:#f08a78;--card:#2a2616}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,serif}
+main{max-width:900px;margin:0 auto;padding:16px 14px 48px}
+h1{font-size:1.5rem;margin:0;line-height:1.2}
+h2{font-size:1.15rem;margin:22px 0 8px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:14px}
+.pill{font:600 .9rem system-ui,sans-serif;border:1.5px solid var(--ink);border-radius:999px;padding:4px 14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:12px}
+.sub,.hint{color:var(--muted);font:.9rem/1.4 system-ui,sans-serif;margin:4px 0 8px}
+button{font:600 1rem system-ui,sans-serif;background:var(--accent);color:var(--on);border:0;border-radius:6px;padding:10px 18px;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input,select{font:1rem system-ui,sans-serif;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:9px;max-width:100%}
+input.wide,select.wide{width:100%;margin-bottom:8px}
+.code{font:700 2rem/1 system-ui,sans-serif;letter-spacing:.2em}
+.event{background:var(--card);border:2px solid var(--ink);border-radius:10px;padding:16px;margin-bottom:12px}
+.event .cat{font:600 .85rem system-ui,sans-serif;color:var(--muted)}
+.event h3{margin:4px 0;font-size:1.3rem;line-height:1.25}
+.teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.team{border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--surface)}
+.team small{display:block;color:var(--muted);font-family:system-ui,sans-serif}
+.team select{width:100%;margin-top:8px}
+.act{display:block;width:100%;text-align:left;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);margin:6px 0}
+.act small{display:block;font-weight:400;opacity:.8}
+.act.on{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font:.92rem system-ui,sans-serif}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600}.n{text-align:right!important}
+.up{color:var(--up)}.down{color:var(--down)}
+.bd{font:.9rem/1.5 system-ui,sans-serif;margin:6px 0 0;padding:0;list-style:none}
+.bar{display:grid;grid-template-columns:130px 1fr 50px;align-items:center;gap:8px;margin:6px 0;font-family:system-ui,sans-serif}
+.bar i{display:block;height:20px;background:var(--accent);border-radius:3px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+details.rules{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 14px;margin-bottom:12px}
+details.rules summary{font:600 1rem system-ui,sans-serif;cursor:pointer;padding:10px 0}
+@media (max-width:560px){.bar{grid-template-columns:90px 1fr 40px}}
+</style>
+</head>
+<body>
+<main>
+<div class="top"><h1>Внешняя среда: игра на опережение</h1><div class="pill" id="pill">Внешняя среда</div></div>
+<div id="app"></div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ============ 1. ВСТАВЬТЕ СЮДА НАСТРОЙКИ ИЗ FIREBASE ============
+const firebaseConfig = {
+  apiKey: "AIzaSyAsSI6e8zlJhYWGT3XGhvNBxPUwZt_ThtE",
+  authDomain: "bisiness-game.firebaseapp.com",
+  databaseURL: "https://bisiness-game-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "bisiness-game",
+  storageBucket: "bisiness-game.firebasestorage.app",
+  messagingSenderId: "319443934677",
+  appId: "1:319443934677:web:a0b7d25ebe67663662f15c"
+};
+// ================================================================
+
+// ============ 2. ПРАВИЛА ИГРЫ (можно менять) ============
+const START_CAPITAL = 100, START_STAB = 50, FIT_BONUS = 10;
+const BUSINESSES = [
+  {id:"coffee", name:"Кофейня", icon:"☕"}, {id:"furniture", name:"Мебельная фабрика", icon:"🪑"},
+  {id:"shop", name:"Интернет-магазин", icon:"🛒"}, {id:"it", name:"ИТ-студия", icon:"💻"},
+  {id:"farm", name:"Агроферма", icon:"🌾"}, {id:"logistics", name:"Логистическая компания", icon:"🚛"}
+];
+// fx: [капитал, устойчивость] для каждого бизнеса; fit: подходящие решения
+const EVENTS = [
+  {id:"credit", cat:"Экономика", title:"Стоимость кредитов резко выросла", text:"Банки подняли ставки. Бизнесу с долгами и оборудованием стало тяжелее.", fit:["adapt","partner"],
+   fx:{coffee:[-8,-4],furniture:[-22,-12],shop:[-5,0],it:[-4,0],farm:[-18,-10],logistics:[-20,-10]}},
+  {id:"auto", cat:"Технологии", title:"Конкурент внедрил автоматизацию", text:"Новые станки и алгоритмы снижают издержки. Кто успел, тот выигрывает.", fit:["invest","partner"],
+   fx:{coffee:[-4,-2],furniture:[-15,-8],shop:[6,3],it:[14,6],farm:[-6,-3],logistics:[-18,-10]}},
+  {id:"cheap", cat:"Потребители", title:"Спрос сместился в сторону более дешёвых продуктов", text:"Покупатели экономят и сравнивают цены. Премиальное продаётся хуже.", fit:["adapt","segment"],
+   fx:{coffee:[-10,-5],furniture:[-14,-7],shop:[10,4],it:[-3,0],farm:[8,3],logistics:[4,2]}},
+  {id:"law", cat:"Законодательство", title:"Введены новые требования к продукции", text:"Нужна сертификация и новые стандарты. Подготовленные получают преимущество.", fit:["adapt","supplier"],
+   fx:{coffee:[-6,-3],furniture:[-18,-9],shop:[-8,-4],it:[5,2],farm:[-14,-8],logistics:[-10,-5]}},
+  {id:"region", cat:"Рынок", title:"Появился перспективный регион для расширения", text:"Регион растёт быстро и пока не занят. Окно возможностей короткое.", fit:["segment","invest"],
+   fx:{coffee:[4,2],furniture:[10,4],shop:[16,6],it:[8,3],farm:[6,2],logistics:[18,8]}},
+  {id:"supply", cat:"Поставщики", title:"Главный поставщик сорвал сроки", text:"Сырьё дорожает и задерживается. Зависимые компании страдают сильнее.", fit:["supplier","partner"],
+   fx:{coffee:[-12,-6],furniture:[-16,-9],shop:[-10,-5],it:[0,0],farm:[-20,-11],logistics:[-8,-4]}}
+];
+const ACTIONS = [
+  {id:"adapt", name:"Адаптироваться", cost:8, risk:0.2, bonus:14, stab:3},
+  {id:"invest", name:"Инвестировать", cost:25, risk:0.4, bonus:45, stab:2},
+  {id:"supplier", name:"Сменить поставщика", cost:12, risk:0.25, bonus:20, stab:4},
+  {id:"segment", name:"Выйти в новый сегмент", cost:20, risk:0.35, bonus:38, stab:1},
+  {id:"partner", name:"Вступить в партнёрство", cost:15, risk:0.3, bonus:28, stab:5},
+  {id:"wait", name:"Ждать", cost:0, risk:0, bonus:0, stab:-3}
+];
+
+// ============ 3. ПРОГРАММА ============
+const $ = s => document.querySelector(s);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const biz = id => BUSINESSES.find(b => b.id === id) || BUSINESSES[0];
+const act = id => ACTIONS.find(a => a.id === id);
+const sign = n => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n);
+const clamp = (n,a,b) => Math.max(a, Math.min(b, n));
+const score = t => t.capital + 2*t.stab + 10*t.opps;
+const ls = {get:k=>{try{return localStorage.getItem(k)}catch(e){return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}, del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+const configured =
+  typeof firebaseConfig.apiKey === "string" &&
+  firebaseConfig.apiKey.length > 0 &&
+  !firebaseConfig.apiKey.startsWith("ВСТАВЬТЕ") &&
+  typeof firebaseConfig.databaseURL === "string" &&
+  firebaseConfig.databaseURL.length > 0;
+let db = null, G, code = null, role = null, listener = null, errMsg = "", draft = {name:"", biz:"coffee"};
+const ref = p => db.ref("games/" + code + (p ? "/" + p : ""));
+const myId = () => ls.get("ves-team-" + code);
+const teams = () => Object.entries(G.teams || {}).map(([id,t]) => ({id, ...t}));
+const curEvent = () => EVENTS.find(e => e.id === (G.order || [])[G.round]);
+const showErr = e => { errMsg = "Ошибка: " + (e && e.message || e); render(); };
+const link = () => {
+  const url = new URL(location.href);
+  url.hash = "";
+  url.search = "";
+  url.searchParams.set("g", code);
+  return url.href;
+};
+
+function enter(c, r){
+  c = String(c || "").trim().toUpperCase();
+  if(!/^[A-HJ-NP-Z2-9]{4}$/.test(c)){
+    errMsg = "Введите корректный четырёхзначный код игры.";
+    render();
+    return;
+  }
+  leave(); code = c; role = r; errMsg = "Подключаемся к игре…"; ls.set("ves-last", c); G = undefined;
+  try {
+    listener = ref();
+    listener.on("value", s => {
+      G = s.val();
+      errMsg = G ? "" : "Игра с таким кодом не найдена. Проверьте код у преподавателя.";
+      render();
+    }, e => {
+      errMsg = "Не удалось подключиться к игре. Проверьте интернет и правила доступа Firebase. " + (e && e.message ? e.message : "");
+      render();
+    });
+  } catch(e) {
+    errMsg = "Ошибка подключения к Firebase: " + (e && e.message || e);
+  }
+  render();
+}
+function leave(){ if(listener){ listener.off(); listener = null; } G = undefined; code = null; role = null; }
+function home(){ leave(); ls.del("ves-last"); render(); }
+function createGame(){
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = "";
+  for(let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)];
+  db.ref("games/" + c).set({stage:"lobby", round:0, created:Date.now()})
+    .then(() => { ls.set("ves-teacher-" + c, "1"); enter(c, "teacher"); }).catch(showErr);
+}
+function joinTeam(){
+  const id = "t" + Math.random().toString(36).slice(2, 8);
+  ls.set("ves-team-" + code, id);
+  ref("teams/" + id).set({name:(draft.name.trim() || "Команда").slice(0, 30), biz:draft.biz, capital:START_CAPITAL, stab:START_STAB, opps:0})
+    .catch(e => { ls.del("ves-team-" + code); showErr(e); });
+}
+function startGame(){
+  const order = EVENTS.map(e => e.id).sort(() => Math.random() - 0.5);
+  ref().update({order, round:0, stage:"choose", choices:null}).catch(showErr);
+}
+// Считает раунд ТОЛЬКО устройство преподавателя
+function resolve(){
+  // Защита от повторного нажатия и вызова не в тот момент.
+  if(role !== "teacher" || !G || G.stage !== "choose") return;
+  const e = curEvent();
+  if(!e) { showErr("Не удалось определить событие текущего раунда."); return; }
+  const ch = G.choices || {}, nt = {}, last = {};
+  for(const t of teams()){
+    const a = act(ch[t.id] || "wait"), [dc, ds] = e.fx[t.biz];
+    const ok = a.id !== "wait" && Math.random() >= a.risk;
+    const fit = ok && e.fit.includes(a.id);
+    const bonus = ok ? a.bonus + (fit ? FIT_BONUS : 0) : 0;
+    nt[t.id] = {name:t.name, biz:t.biz, capital:t.capital + dc - a.cost + bonus, stab:clamp(t.stab + ds + a.stab, 0, 100), opps:t.opps + (fit ? 1 : 0)};
+    last[t.id] = {action:a.name, dc, ds, cost:a.cost, bonus, ok, fit, wait:a.id === "wait", astab:a.stab};
+  }
+  ref().update({teams:nt, last, stage:"result"}).catch(showErr);
+}
+function next(){
+  if(role !== "teacher" || !G || G.stage !== "result") return;
+  const r = G.round + 1;
+  ref().update({round:r, stage:r >= EVENTS.length ? "done" : "choose", choices:null}).catch(showErr);
+}
+
+// ---- отрисовка ----
+function actOptions(sel){ return `<option value="">Выберите решение…</option>` + ACTIONS.map(a => `<option value="${a.id}" ${a.id===sel?"selected":""}>${a.name} (цена ${a.cost}, риск ${Math.round(a.risk*100)}%)</option>`).join(""); }
+function viewRules(){
+  const rows = ACTIONS.map(a => `<tr><td>${a.name}</td><td class="n">${a.cost}</td><td class="n">${Math.round(a.risk*100)}%</td><td class="n">${a.bonus ? sign(a.bonus) : "—"}</td><td class="n">${sign(a.stab)}</td></tr>`).join("");
+  return `<details class="rules"><summary>Правила игры</summary>
+    <p>Цель: за ${EVENTS.length} раундов сохранить капитал и устойчивость и использовать возможности, которые открывают внешние события. Побеждает команда с наибольшим числом очков.</p>
+    <p>Старт: капитал ${START_CAPITAL}, устойчивость ${START_STAB} из 100. В каждом раунде преподаватель открывает событие, команда выбирает одно решение. Цена списывается всегда, выигрыш даётся только если решение сработало. Если оно ещё и подходит к событию, выигрыш растёт на ${FIT_BONUS} и команде засчитывается возможность.</p>
+    <div class="tw"><table><tr><th>Решение</th><th class="n">Цена</th><th class="n">Риск провала</th><th class="n">Выигрыш</th><th class="n">Устойчивость</th></tr>${rows}</table></div>
+    <p><b>Очки = капитал + 2 × устойчивость + 10 × возможности.</b></p></details>`;
+}
+function viewEvent(){ const e = curEvent(); return e ? `<div class="event"><div class="cat">${e.cat}</div><h3>${e.title}</h3><div>${e.text}</div></div>` : ""; }
+function bd(r, name, b){
+  const net = r.dc - r.cost + r.bonus;
+  const o = r.wait ? "команда ждала" : r.ok ? (r.fit ? "сработало и подошло к событию (+1 возможность)" : "сработало") : "не сработало";
+  return `<div class="team"><b>${biz(b).icon} ${esc(name)}: <span class="${net>=0?"up":"down"}">${sign(net)} к капиталу</span></b><ul class="bd">
+    <li>Событие: ${sign(r.dc)} капитал, ${sign(r.ds)} устойчивость</li>
+    <li>Решение «${r.action}»: −${r.cost} цена, ${o}${r.bonus ? ", " + sign(r.bonus) + " выигрыш" : ""}, ${sign(r.astab)} устойчивость</li></ul></div>`;
+}
+function viewBoard(){
+  const rows = teams().sort((a,b) => score(b) - score(a)).map(t => `<tr><td>${biz(t.biz).icon} ${esc(t.name)}</td><td>${biz(t.biz).name}</td><td class="n">${t.capital}</td><td class="n">${t.stab}</td><td class="n">${t.opps}</td><td class="n"><b>${score(t)}</b></td></tr>`).join("");
+  return `<h2>Табло</h2><div class="panel tw"><table><tr><th>Команда</th><th>Бизнес</th><th class="n">Капитал</th><th class="n">Устойчивость</th><th class="n">Возможности</th><th class="n">Очки</th></tr>${rows}</table></div>`;
+}
+function viewFinal(){
+  const s = teams().sort((a,b) => score(b) - score(a)), max = Math.max(...s.map(score), 1);
+  const bars = s.map(t => `<div class="bar"><span>${biz(t.biz).icon} ${esc(t.name)}</span><i style="width:${Math.max(2, score(t)/max*100)}%"></i><span>${score(t)}</span></div>`).join("");
+  const st = [...s].sort((a,b) => b.stab - a.stab)[0], op = [...s].sort((a,b) => b.opps - a.opps)[0];
+  return `<h2>Итоги игры</h2><div class="panel">${bars}<p>Лидер: <b>${esc(s[0].name)}</b>. Самая устойчивая: <b>${esc(st.name)}</b>. Больше всего возможностей: <b>${esc(op.name)}</b>.</p>
+    <p class="hint">Обсудите: почему одни и те же события дали такие разные результаты у разных бизнесов?</p></div>`;
+}
+const homeBtn = `<div class="actions"><button class="ghost" id="home">Выйти из игры</button></div>`;
+
+function viewTeacher(){
+  const ts = teams(), ch = G.choices || {};
+  const shareLink = link();
+  const localWarning = location.protocol === "file:" ? `<p class="hint down"><b>Важно:</b> сейчас игра открыта как локальный файл. Ссылка file:// не будет работать на устройствах студентов. Сначала разместите HTML-файл на HTTPS-хостинге (например, GitHub Pages), затем создайте игру заново и отправьте ссылку с сайта.</p>` : "";
+  let h = `<div class="panel"><b>Код игры: <span class="code">${code}</span></b>
+    <p class="hint">Ссылка для студентов (откройте её на телефоне или покажите код):</p><input class="wide" readonly value="${esc(shareLink)}" onclick="this.select()">${localWarning}</div>` + viewRules();
+  if(G.stage === "lobby"){
+    h += `<h2>Вошли команды: ${ts.length}</h2>` + (ts.length ? `<div class="teams">${ts.map(t => `<div class="team"><b>${biz(t.biz).icon} ${esc(t.name)}</b><small>${biz(t.biz).name}</small></div>`).join("")}</div>` : `<p class="hint">Пока никто не вошёл.</p>`)
+      + `<div class="actions"><button id="start" ${ts.length < 2 ? "disabled" : ""}>Начать игру</button></div><p class="hint">Нужно минимум две команды. Новые команды не смогут войти после старта.</p>`;
+  } else if(G.stage === "choose"){
+    h += viewEvent() + `<h2>Решения команд</h2><div class="teams">${ts.map(t => `<div class="team"><b>${biz(t.biz).icon} ${esc(t.name)}</b><small>${ch[t.id] ? "решение принято" : "ждём решение"}</small><select data-tsel="${t.id}" aria-label="Решение команды ${esc(t.name)}">${actOptions(ch[t.id])}</select></div>`).join("")}</div>
+      <div class="actions"><button id="resolve" ${ts.every(t => ch[t.id]) ? "" : "disabled"}>Подсчитать раунд</button></div><p class="hint">Преподаватель может выбрать решение за команду, у которой нет связи.</p>` + viewBoard();
+  } else if(G.stage === "result"){
+    const l = G.last || {};
+    h += viewEvent() + `<h2>Итоги раунда</h2><div class="teams">${ts.map(t => l[t.id] ? bd(l[t.id], t.name, t.biz) : "").join("")}</div>
+      <div class="actions"><button id="next">${G.round + 1 >= EVENTS.length ? "Показать итоги игры" : "Следующее событие"}</button></div>` + viewBoard();
+  } else h += viewFinal() + viewBoard();
+  return h + homeBtn;
+}
+function viewStudent(){
+  const id = myId(), me = (G.teams || {})[id], ts = teams();
+  let h = viewRules();
+  if(!me){
+    const claim = ts.length ? `<h2>Уже входили?</h2><p class="hint">Выберите свою команду, чтобы вернуться в игру.</p><div class="actions">${ts.map(t => `<button class="ghost" data-claim="${t.id}">${esc(t.name)}</button>`).join("")}</div>` : "";
+    if(G.stage !== "lobby") return h + `<div class="panel">Игра уже началась. Если вы входили раньше, выберите свою команду ниже.</div>` + claim + homeBtn;
+    return h + `<div class="panel"><h2 style="margin-top:0">Ваша команда</h2><input class="wide" id="tname" maxlength="30" placeholder="Название команды" value="${esc(draft.name)}">
+      <select class="wide" id="tbiz">${BUSINESSES.map(b => `<option value="${b.id}" ${b.id===draft.biz?"selected":""}>${b.icon} ${b.name}</option>`).join("")}</select>
+      <button id="joinTeam">Войти в игру</button></div>` + claim + homeBtn;
+  }
+  h += `<div class="panel"><b>${biz(me.biz).icon} ${esc(me.name)}</b> <small class="hint">${biz(me.biz).name}</small><p class="hint" style="margin:6px 0 0">Капитал <b>${me.capital}</b> · Устойчивость <b>${me.stab}</b> · Возможности <b>${me.opps}</b></p></div>`;
+  if(G.stage === "lobby") h += `<div class="panel">Вы в игре. Ждём, когда преподаватель начнёт. Команд: ${ts.length}.</div>`;
+  else if(G.stage === "choose"){
+    const sel = (G.choices || {})[id];
+    h += viewEvent() + `<h2>Ваше решение</h2>` + ACTIONS.map(a => `<button class="act ${a.id===sel?"on":""}" data-pick="${a.id}">${a.name}<small>цена ${a.cost}, риск провала ${Math.round(a.risk*100)}%, выигрыш ${a.bonus ? sign(a.bonus) : "нет"}</small></button>`).join("")
+      + `<p class="hint">${sel ? "Решение принято. Его можно изменить, пока преподаватель не подсчитал раунд." : "Выберите решение вместе с командой."}</p>`;
+  } else if(G.stage === "result"){
+    const r = (G.last || {})[id];
+    h += viewEvent() + `<h2>Итоги раунда</h2>` + (r ? bd(r, me.name, me.biz) : "") + `<p class="hint">Ждём следующего события.</p>` + viewBoard();
+  } else h += viewFinal() + viewBoard();
+  return h + homeBtn;
+}
+function viewHome(){
+  return `<div class="panel"><h2 style="margin-top:0">Преподаватель</h2><p class="sub">Создайте игру и покажите студентам код.</p><button id="create">Создать игру</button></div>
+    <div class="panel"><h2 style="margin-top:0">Студент</h2><p class="sub">Введите четырёхзначный код от преподавателя.</p><input class="wide" id="gcode" maxlength="4" placeholder="Код игры" autocapitalize="characters" autocomplete="off"><button id="join">Войти</button></div>`;
+}
+function viewHelp(msg){
+  return `<div class="panel"><h2 style="margin-top:0">${msg}</h2><p>Откройте этот файл в текстовом редакторе, найдите блок «ВСТАВЬТЕ СЮДА НАСТРОЙКИ ИЗ FIREBASE» вверху скрипта и замените значения на свои из консоли Firebase (Project settings, Your apps, Web app). Подробная инструкция в чате.</p></div>`;
+}
+function render(){
+  const e = G && G.stage ? curEvent() : null;
+  $("#pill").textContent = !G || !G.stage ? "Внешняя среда" : G.stage === "lobby" ? "Набор команд" : G.stage === "done" ? "Игра окончена" : "Раунд " + (G.round + 1) + " из " + EVENTS.length;
+  let h = errMsg ? `<div class="panel down">${esc(errMsg)}</div>` : "";
+  if(!configured) h += viewHelp("Не заполнены настройки Firebase");
+  else if(!db) h += viewHelp("Не загрузилась библиотека Firebase. Проверьте интернет");
+  else if(!code) h += viewHome();
+  else if(G === undefined) h += `<p class="sub">Подключаемся…</p>`;
+  else if(G === null || !G.stage) h += `<div class="panel">Игра с кодом ${esc(code)} не найдена.</div>` + homeBtn;
+  else h += role === "teacher" ? viewTeacher() : viewStudent();
+  $("#app").innerHTML = h;
+}
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("button"); if(!t) return;
+  if(t.id === "create") createGame();
+  else if(t.id === "join"){
+    alert("Кнопка Войти сработала!");
+    const c = (($("#gcode")?.value) || "").trim().toUpperCase();
+    if(!c){ errMsg = "Введите код игры, который сообщил преподаватель."; render(); return; }
+    // Убираем фокус с поля перед сменой экрана и сразу показываем статус подключения.
+    const input = $("#gcode");
+    if(input) input.blur();
+    enter(c, ls.get("ves-teacher-" + c) ? "teacher" : "student");
+  }
+  else if(t.id === "home") home();
+  else if(t.id === "start") startGame();
+  else if(t.id === "resolve") resolve();
+  else if(t.id === "next") next();
+  else if(t.id === "joinTeam") joinTeam();
+  else if(t.dataset.pick){
+    const id = myId();
+    if(role === "student" && G && G.stage === "choose" && id && G.teams && G.teams[id])
+      ref("choices/" + id).set(t.dataset.pick).catch(showErr);
+  }
+  else if(t.dataset.claim){ ls.set("ves-team-" + code, t.dataset.claim); render(); }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(t.dataset.tsel !== undefined && role === "teacher" && G && G.stage === "choose"){
+    const p = "choices/" + t.dataset.tsel;
+    (t.value ? ref(p).set(t.value) : ref(p).remove()).catch(showErr);
+  }
+  else if(t.id === "tbiz") draft.biz = t.value;
+});
+document.addEventListener("input", e => { if(e.target.id === "tname") draft.name = e.target.value; });
+
+(function boot(){
+  if(configured && typeof firebase !== "undefined"){
+    try{
+      firebase.initializeApp(firebaseConfig); db = firebase.database();
+      const c = (new URLSearchParams(location.search).get("g") || ls.get("ves-last") || "").toUpperCase();
+      if(c){ enter(c, ls.get("ves-teacher-" + c) ? "teacher" : "student"); return; }
+    }catch(e){ errMsg = "Ошибка настройки: " + e.message; }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
